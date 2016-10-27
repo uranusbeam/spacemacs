@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+
+docker build                \
+  --build-arg _UNAME="jare" \
+  -t $IMAGE_NAME .

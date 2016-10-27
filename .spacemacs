@@ -10,7 +10,7 @@ values."
    ;; Base distribution to use. This is a layer contained in the directory
    ;; `+distribution'. For now available distributions are `spacemacs-base'
    ;; or `spacemacs'. (default 'spacemacs)
-   dotspacemacs-distribution 'spacemacs
+   dotspacemacs-distribution 'spacemacs-docker
    ;; Lazy installation of layers (i.e. layers are installed only when a file
    ;; with a supported type is opened). Possible values are `all', `unused'
    ;; and `nil'. `unused' will lazy install only unused layers (i.e. layers
@@ -24,40 +24,55 @@ values."
    ;; If non-nil then Spacemacs will ask for confirmation before installing
    ;; a layer lazily. (default t)
    dotspacemacs-ask-for-lazy-installation t
+   ;; If non-nil layers with lazy install support are lazy installed.
    ;; List of additional paths where to look for configuration layers.
    ;; Paths must have a trailing slash (i.e. `~/.mycontribs/')
    dotspacemacs-configuration-layer-path '()
-   ;; List of configuration layers to load. If it is the symbol `all' instead
-   ;; of a list then all discovered layers will be installed.
+   ;; List of configuration layers to load.
    dotspacemacs-configuration-layers
-   '(
-     helm
+   '(helm
      emacs-lisp
      restclient
      html
-     javascript
      markdown
+     dash
      shell-scripts
-     typescript
+     shell
+     ibuffer
      yaml
+     (clojure :variables clojure-enable-fancify-symbols t)
      git
+     deft
+     fasd
      github
+     speed-reading
+     rebox
+     elfeed
      evil-snipe
      vinegar
+     imenu-list
      colors
      auto-completion
      smex
      spell-checking
      version-control
      syntax-checking
-     shell
      search-engine
      prodigy
+     pdf-tools
+     javascript
+     pandoc
+     ;;(pandoc :variables
+     ;;        pandoc-docker-spacemacs-disable-dependencies-installer t)
      org
+     colors
      gnus
-     clojure
+     ;;semantic
+     smex
+     emoji
+     gtags
      ranger
-     dockerfile
+     docker
      themes-megapack
      (go :variables go-use-gometalinter t))
    ;; List of additional packages that will be installed without being
@@ -65,16 +80,18 @@ values."
    ;; packages, then consider creating a layer. You can also put the
    ;; configuration in `dotspacemacs/user-config'.
    dotspacemacs-additional-packages '()
-   ;; A list of packages and/or extensions that will not be install and loaded.
+   ;; A list of packages that cannot be updated.
+   dotspacemacs-frozen-packages '()
+   ;; A list of packages that will not be installed and loaded.
    dotspacemacs-excluded-packages '()
-   ;; Defines the behaviour of Spacemacs when downloading packages.
-   ;; Possible values are `used', `used-but-keep-unused' and `all'. `used' will
-   ;; download only explicitly used packages and remove any unused packages as
-   ;; well as their dependencies. `used-but-keep-unused' will download only the
-   ;; used packages but won't delete them if they become unused. `all' will
-   ;; download all the packages regardless if they are used or not and packages
-   ;; won't be deleted by Spacemacs. (default is `used')
-    dotspacemacs-install-packages 'all))
+   ;; Defines the behaviour of Spacemacs when installing packages.
+   ;; Possible values are `used-only', `used-but-keep-unused' and `all'.
+   ;; `used-only' installs only explicitly used packages and uninstall any
+   ;; unused packages as well as their unused dependencies.
+   ;; `used-but-keep-unused' installs only the used packages but won't uninstall
+   ;; them if they become unused. `all' installs *all* packages supported by
+   ;; Spacemacs and never uninstall them. (default is `used-only')
+   dotspacemacs-install-packages 'used-but-keep-unused))
 
 (defun dotspacemacs/init ()
   "Initialization function.
@@ -91,12 +108,18 @@ values."
    ;; This variable has no effect if Emacs is launched with the parameter
    ;; `--insecure' which forces the value of this variable to nil.
    ;; (default t)
-   dotspacemacs-elpa-https nil
+   dotspacemacs-elpa-https t
    ;; Maximum allowed time in seconds to contact an ELPA repository.
    dotspacemacs-elpa-timeout 5
    ;; If non nil then spacemacs will check for updates at startup
-   ;; when the current branch is not `develop'. (default t)
+   ;; when the current branch is not `develop'. Note that checking for
+   ;; new versions works via git commands, thus it calls GitHub services
+   ;; whenever you start Emacs. (default nil)
    dotspacemacs-check-for-update nil
+   ;; If non-nil, a form that evaluates to a package directory. For example, to
+   ;; use different package directories for different Emacs versions, set this
+   ;; to `emacs-version'.
+   dotspacemacs-elpa-subdirectory nil
    ;; One of `vim', `emacs' or `hybrid'.
    ;; `hybrid' is like `vim' except that `insert state' is replaced by the
    ;; `hybrid state' with `emacs' key bindings. The value can also be a list
@@ -113,19 +136,23 @@ values."
    ;; by your Emacs build.
    ;; If the value is nil then no banner is displayed. (default 'official)
    dotspacemacs-startup-banner 'official
-   ;; List of items to show in the startup buffer. If nil it is disabled.
-   ;; Possible values are: `recents' `bookmarks' `projects' `agenda' `todos'.
-   ;; (default '(recents projects))
-   dotspacemacs-startup-lists '(recents projects)
-   ;; Number of recent files to show in the startup buffer. Ignored if
-   ;; `dotspacemacs-startup-lists' doesn't include `recents'. (default 5)
-   dotspacemacs-startup-recent-list-size 5
+   ;; List of items to show in startup buffer or an association list of
+   ;; the form `(list-type . list-size)`. If nil then it is disabled.
+   ;; Possible values for list-type are:
+   ;; `recents' `bookmarks' `projects' `agenda' `todos'."
+   ;; List sizes may be nil, in which case
+   ;; `spacemacs-buffer-startup-lists-length' takes effect.
+   dotspacemacs-startup-lists '((recents . 5)
+                                (projects . 7))
+   ;; True if the home buffer should respond to resize events.
+   dotspacemacs-startup-buffer-responsive t
    ;; Default major mode of the scratch buffer (default `text-mode')
    dotspacemacs-scratch-mode 'text-mode
    ;; List of themes, the first of the list is loaded when spacemacs starts.
    ;; Press <SPC> T n to cycle to the next theme in the list (works great
    ;; with 2 themes variants, one dark and one light)
-   dotspacemacs-themes '(darkokai
+   dotspacemacs-themes '(gruvbox
+                         darkokai
                          monokai
                          spacemacs-dark
                          spacemacs-light
@@ -135,13 +162,13 @@ values."
                          zenburn)
    ;; If non nil the cursor color matches the state color in GUI Emacs.
    dotspacemacs-colorize-cursor-according-to-state t
-   ;; Default font. `powerline-scale' allows to quickly tweak the mode-line
-   ;; size to make separators look not too crappy.
+   ;; Default font, or prioritized list of fonts. `powerline-scale' allows to
+   ;; quickly tweak the mode-line size to make separators look not too crappy.
    dotspacemacs-default-font '("Source Code Pro"
-                               :size 14
+                               :size 13
                                :weight normal
                                :width normal
-                               :powerline-scale 1.0)
+                               :powerline-scale 1.1)
    ;; The leader key
    dotspacemacs-leader-key "SPC"
    ;; The leader key accessible in `emacs state' and `insert state'
@@ -155,7 +182,7 @@ values."
    dotspacemacs-major-mode-emacs-leader-key "C-M-m"
    ;; The key used for Emacs commands (M-x) (after pressing on the leader key).
    ;; (default "SPC")
-   dotspacemacs-emacs-command-key nil
+   dotspacemacs-emacs-command-key "SPC"
    ;; These variables control whether separate commands are bound in the GUI to
    ;; the key pairs C-i, TAB and C-m, RET.
    ;; Setting it to a non-nil value, allows for separate commands under <C-i>
@@ -165,6 +192,12 @@ values."
    dotspacemacs-distinguish-gui-tab nil
    ;; If non nil `Y' is remapped to `y$' in Evil states. (default nil)
    dotspacemacs-remap-Y-to-y$ nil
+   ;; If non-nil, the shift mappings `<' and `>' retain visual state if used
+   ;; there. (default t)
+   dotspacemacs-retain-visual-state-on-shift t
+   ;; If non-nil, J and K move lines up and down when in visual mode.
+   ;; (default nil)
+   dotspacemacs-visual-line-move-text nil
    ;; If non nil, inverse the meaning of `g' in `:substitute' Evil ex-command.
    ;; (default nil)
    dotspacemacs-ex-substitute-global nil
@@ -195,6 +228,11 @@ values."
    ;; define the position to display `helm', options are `bottom', `top',
    ;; `left', or `right'. (default 'bottom)
    dotspacemacs-helm-position 'bottom
+   ;; Controls fuzzy matching in helm. If set to `always', force fuzzy matching
+   ;; in all non-asynchronous sources. If set to `source', preserve individual
+   ;; source settings. Else, disable fuzzy matching in all sources.
+   ;; (default 'always)
+   dotspacemacs-helm-use-fuzzy 'always
    ;; If non nil the paste micro-state is enabled. When enabled pressing `p`
    ;; several times cycle between the kill ring content. (default nil)
    dotspacemacs-enable-paste-transient-state nil
@@ -242,6 +280,9 @@ values."
    ;; derivatives. If set to `relative', also turns on relative line numbers.
    ;; (default nil)
    dotspacemacs-line-numbers 'relative
+   ;; Code folding method. Possible values are `evil' and `origami'.
+   ;; (default 'evil)
+   dotspacemacs-folding-method 'evil
    ;; If non-nil smartparens-strict-mode will be enabled in programming modes.
    ;; (default nil)
    dotspacemacs-smartparens-strict-mode nil
@@ -253,7 +294,7 @@ values."
    ;; `current', `all' or `nil'. Default is `all' (highlight any scope and
    ;; emphasis the current one). (default 'all)
    dotspacemacs-highlight-delimiters 'all
-   ;; If non nil advises quit functions to keep server open when quitting.
+   ;; If non nil, advise quit functions to keep server open when quitting.
    ;; (default nil)
    dotspacemacs-persistent-server nil
    ;; List of search tool executable names. Spacemacs uses the first installed
@@ -278,28 +319,7 @@ It is called immediately after `dotspacemacs/init', before layer configuration
 executes.
  This function is mostly useful for variables that need to be set
 before packages are loaded. If you are unsure, you should try in setting them in
-`dotspacemacs/user-config' first."
-
-  ;; Start spacemacs in the workspace
-  (getenv "HOME")
-  (setq default-directory "~/workspace/")
-
-  ;; Automatically save and restore sessions
-  (require 'desktop)
-  (desktop-save-mode 1)
-  (setq desktop-path '("~/workspace/"))
-  (setq desktop-dirname "~/workspace/")
-  (setq desktop-base-file-name "emacs-desktop") 
-  (defun my-desktop-save ()
-    (interactive)
-    ;; Don't call desktop-save-in-desktop-dir, as it prints a message.
-    (if (eq (desktop-owner) (emacs-pid))
-        (desktop-save desktop-dirname)))
-  (add-hook 'auto-save-hook 'my-desktop-save)
-
-  ;; Frame title
-  (setq frame-title-format '("Spacemacs"))
-  )
+`dotspacemacs/user-config' first.")
 
 (defun dotspacemacs/user-config ()
   "Configuration function for user code.
@@ -308,81 +328,30 @@ layers configuration.
 This is the place where most of your configurations should be done. Unless it is
 explicitly specified that a variable should be set before a package is loaded,
 you should place you code here."
-
   ;;===========Text-representations-go=============================
   (add-hook 'go-mode-hook
             (lambda ()
               (push '("<-" . ?←) prettify-symbols-alist)
               (push '("->" . ?→) prettify-symbols-alist)))
-
-  ;;===========Text-representations-typescript=====================
-  (add-hook 'typescript-mode-hook
-            (lambda ()
-              (push '("=>" . ?⇒) prettify-symbols-alist)
-              (push '("function" . ?ƒ) prettify-symbols-alist)))
-  ;;===============================================================
-
   ;; replace the standard text representations globally
   (global-prettify-symbols-mode +1)
-
-  ;;===========Use Iceweasel to open links========================================
-  (defun browse-url-firefox (url &optional new-window)
-    "Ask the Firefox WWW browser to load URL.
-  Default to the URL around or before point.  The strings in
-  variable `browse-url-firefox-arguments' are also passed to
-  Firefox.
-     When called interactively, if variable
-     `browse-url-new-window-flag' is non-nil, load the document in a
-      new Firefox window, otherwise use a random existing one.  A
-      non-nil interactive prefix argument reverses the effect of
-      `browse-url-new-window-flag'.
-      If `browse-url-firefox-new-window-is-tab' is non-nil, then
-      whenever a document would otherwise be loaded in a new window, it
-      is loaded in a new tab in an existing window instead.
-      When called non-interactively, optional second argument
-      NEW-WINDOW is used instead of `browse-url-new-window-flag'."
-    (interactive (browse-url-interactive-arg "URL: "))
-    (setq url (browse-url-encode-url url))
-    (let* ((process-environment (browse-url-process-environment))
-           (window-args (if (browse-url-maybe-new-window new-window)
-                            (if browse-url-firefox-new-window-is-tab
-                                '("-new-tab")
-                              '("-new-window"))))
-           (ff-args (append browse-url-firefox-arguments window-args (list url)))
-           (process-name (concat "firefox " url))
-           (process (apply 'start-process process-name nil
-                           browse-url-firefox-program ff-args)))))
-  ;;===============================================================================
-
   ;; Disable fancy arrows
-  (setq powerline-default-separator 'slant)
-
   ;; Golang testing
   (setq go-use-gocheck-for-testing  t)
-
   ;; Ranger
   (setq ranger-show-preview t)
-
   ;; Magit
   (setq-default git-magit-status-fullscreen t)
   (setq magit-repository-directories '("~/"))
   ;; Use undo-tree globally
   (global-undo-tree-mode 1)
-
-  ;; avy-goto-char-timer bindings
-  ;; avy bindings
-  (define-key evil-normal-state-map (kbd "SPC SPC") 'avy-goto-char-timer)
-
   ;; Enable indent-guide-mode in all buffers
   (indent-guide-global-mode)
-
   ;;Other layers settings
-  (setq typescript-fmt-on-save t
-        auto-completion-enable-help-tooltip t
-        auto-completion-enable-snippets-in-popup t
-        clojure-enable-fancify-symbols t
-        version-control-global-margin t)
-  )
+  (setq auto-completion-enable-help-tooltip t
+        auto-completion-enable-snippets-in-popup t)
+  ;; avy-goto-char-timer bindings
+  (spacemacs/set-leader-keys "SPC" 'avy-goto-char-timer))
 
 ;; Do not write anything past this comment. This is where Emacs will
 ;; auto-generate custom variable definitions.
