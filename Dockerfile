@@ -1,4 +1,4 @@
-FROM jare/onbuild:latest
+FROM spacemacs/onbuild:latest
 
 MAINTAINER JAremko <w3techplaygound@gmail.com>
 
